@@ -1,78 +1,71 @@
-import { isAxiosError } from 'axios';
+import { BaseService, type BaseServiceConfig } from './base-service';
 
-import type { AxiosError, AxiosInstance, AxiosResponse, AxiosRequestConfig } from 'axios';
+export interface CrudResource {
+  id: string | number;
+}
 
-import { createAxiosInstance } from './axios-instance';
+export interface ApiServiceConfig extends BaseServiceConfig {
+  resourcePath?: string;
+  getAccessToken?: () => string | null;
+}
 
-import type { ApiServiceConfig } from './types';
+export class ApiService<T extends CrudResource = CrudResource> extends BaseService {
+  protected resourcePath: string;
+  private static globalAccessTokenGetter: (() => string | null) | null = null;
 
-export class ApiService {
-  protected api: AxiosInstance;
-  protected config: ApiServiceConfig;
-
-  constructor(config: ApiServiceConfig) {
-    this.config = config;
-    this.api = createAxiosInstance(config);
+  // Set token getter once globally
+  static setAccessTokenGetter(getter: () => string | null) {
+    ApiService.globalAccessTokenGetter = getter;
   }
 
-  private async request<T>(endpoint: string, config: AxiosRequestConfig): Promise<T> {
-    try {
-      const requestConfig: AxiosRequestConfig = {
-        ...config,
-        url: endpoint,
-      };
-      const response: AxiosResponse<T> = await this.api.request<T>(requestConfig);
+  constructor(config: ApiServiceConfig & { resourcePath: string }) {
+    super(config);
+    this.resourcePath = config.resourcePath;
 
-      return response.data;
-    } catch (error: unknown) {
-      if (isAxiosError(error)) {
-        const axiosError = error as AxiosError<{ message?: string }>;
-        throw new Error(axiosError.response?.data?.message ?? `API Error: ${axiosError.message}`);
-      }
-      throw new Error('An unexpected error occurred');
+    // Use global token getter
+    this.setupTokenHeader({
+      ...config,
+      getAccessToken: ApiService.globalAccessTokenGetter || config.getAccessToken,
+    });
+  }
+
+  private setupTokenHeader(config: ApiServiceConfig) {
+    const token = config.getAccessToken?.();
+    if (token) {
+      this.api.defaults.headers.common.Authorization = `Bearer ${token}`;
     }
   }
 
-  protected get<T>(endpoint: string, params?: Record<string, unknown>): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'GET',
+  async list(params?: Record<string, any>): Promise<T[]> {
+    return this.get<T[]>({
+      endpoint: this.resourcePath,
       params,
     });
   }
 
-  protected post<T>(endpoint: string, body?: unknown): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'POST',
-      data: body,
+  async getById(id: string | number): Promise<T> {
+    return this.get<T>({
+      endpoint: `${this.resourcePath}/${id}`,
     });
   }
 
-  protected put<T>(endpoint: string, body?: unknown): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'PUT',
-      data: body,
+  async create(data: Partial<T>): Promise<T> {
+    return this.post<T>({
+      endpoint: this.resourcePath,
+      data,
     });
   }
 
-  protected patch<T>(endpoint: string, body?: unknown): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'PATCH',
-      data: body,
+  async update(id: string | number, data: Partial<T>): Promise<T> {
+    return this.put<T>({
+      endpoint: `${this.resourcePath}/${id}`,
+      data,
     });
   }
 
-  protected delete<T>(endpoint: string, params?: Record<string, unknown>): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'DELETE',
-      params,
+  async remove(id: string | number): Promise<void> {
+    return this.delete<void>({
+      endpoint: `${this.resourcePath}/${id}`,
     });
-  }
-
-  public getAxiosInstance(): AxiosInstance {
-    return this.api;
-  }
-
-  public getConfig(): ApiServiceConfig {
-    return this.config;
   }
 }
