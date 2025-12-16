@@ -11,8 +11,22 @@ interface CustomAxiosRequestConfig extends AxiosRequestConfig {
   isPublic?: boolean;
 }
 
-export function buildUrl(serviceName: string, version: string, endpoint: string): string {
-  return `${serviceName}/${version}/${endpoint.replace(/^\/+/, '')}`;
+export function buildUrl(
+  serviceName: string | undefined,
+  version: string | undefined,
+  endpoint: string,
+  prefix?: string,
+): string {
+  const parts: string[] = [];
+
+  if (prefix) parts.push(prefix);
+  if (serviceName) parts.push(serviceName);
+  if (version) parts.push(version);
+
+  const cleanEndpoint = endpoint.replace(/^\/+/, '');
+  if (cleanEndpoint) parts.push(cleanEndpoint);
+
+  return parts.join('/');
 }
 
 export function getCallingMethodName(): string | null {

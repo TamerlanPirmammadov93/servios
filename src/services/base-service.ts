@@ -33,11 +33,12 @@ export class BaseService {
 
   private options: {
     baseURL: string;
-    version: string;
+    version?: string;
     useMock: boolean;
     mockDelay: number;
     isPublic: boolean;
-    serviceName: string;
+    serviceName?: string;
+    prefix?: string;
     retryOnStatusCodes: number[];
     logout: () => void;
     removeAccessToken: () => void;
@@ -58,8 +59,6 @@ export class BaseService {
     };
 
     this.options = {
-      serviceName: 'api',
-      version: 'v1',
       useMock: false,
       mockDelay: 1000,
       isPublic: false,
@@ -118,7 +117,12 @@ export class BaseService {
       config: axiosConfig = {},
     } = config;
 
-    const url = buildUrl(this.options.serviceName, version ?? this.options.version, endpoint);
+    const url = buildUrl(
+      this.options.serviceName,
+      version ?? this.options.version,
+      endpoint,
+      this.options.prefix,
+    );
 
     if ((isMock || this.options.useMock) && mockData !== undefined) {
       if (!this.mock) {

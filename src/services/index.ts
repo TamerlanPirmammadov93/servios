@@ -14,7 +14,7 @@ export {
   removeRefreshToken,
 } from './token';
 
-export { Public } from './decorators';
+export { Public, Private } from './decorators';
 
 export type {
   HttpMethod,

@@ -42,6 +42,7 @@ export interface BaseServiceOptions {
 
   version?: string;
   serviceName?: string;
+  prefix?: string;
 
   isPublic?: boolean;
 
@@ -71,7 +72,7 @@ export interface RefreshTokenResponse {
 
 export type ServiceOverrides = Pick<
   BaseServiceOptions,
-  'serviceName' | 'version' | 'useMock' | 'mockDelay' | 'transformError' | 'retryOnStatusCodes' | 'isPublic'
+  'serviceName' | 'version' | 'prefix' | 'useMock' | 'mockDelay' | 'transformError' | 'retryOnStatusCodes' | 'isPublic'
 >;
 
 export interface ApiServiceConfig {

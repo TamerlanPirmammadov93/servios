@@ -299,6 +299,182 @@ class PublicApiService extends ApiService {
 
 ---
 
+## 🔒 Private Decorator (Override Public)
+
+The `@Private()` decorator allows you to mark specific methods as **authenticated** even when the entire class is marked as `@Public()`.
+
+### Use Case: Mostly Public Service with Few Protected Methods
+
+```typescript
+import { ApiService, Public, Private } from 'servios';
+
+@Public()  // Class is public by default
+class PostsService extends ApiService {
+  constructor() {
+    super({ serviceName: 'posts' });
+  }
+
+  // ✅ Public - inherits from class decorator
+  getAllPosts() {
+    return this.get({ endpoint: 'list' });
+  }
+
+  // ✅ Public - inherits from class decorator
+  getPostById(id: string) {
+    return this.get({ endpoint: `${id}` });
+  }
+
+  // 🔐 Authenticated - @Private overrides class-level @Public
+  @Private()
+  getMyDrafts() {
+    return this.get({ endpoint: 'drafts' });
+  }
+
+  // Authenticated - @Private overrides class-level @Public
+  @Private()
+  createPost(data: any) {
+    return this.post({ endpoint: 'create', data });
+  }
+}
+
+export default new PostsService();
+```
+
+### Priority Order
+
+Decorators follow this priority:
+
+1. **`@Private()` (Highest)** - Always requires authentication
+2. **`@Public()` method-level** - Skips authentication
+3. **`@Public()` class-level** - All methods skip auth (unless overridden)
+4. **Default** - Requires authentication
+
+```typescript
+@Public()
+class ExampleService extends ApiService {
+  // Public (class-level)
+  method1() { }
+
+  // Public (method-level override)
+  @Public()
+  method2() { }
+
+  // Private (method-level override)
+  @Private()
+  method3() { }  // ← Token will be sent!
+}
+```
+
+---
+
+## ⚙️ Framework Setup for Decorators
+
+### React (Vite)
+
+**1. Install plugin:**
+```bash
+npm install --save-dev @babel/plugin-proposal-decorators
+```
+
+**2. Enable in `jsconfig.json` or `tsconfig.json`:**
+```json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
+}
+```
+
+**3. Configure `vite.config.js`:**
+```javascript
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [
+    react({
+      babel: {
+        plugins: [
+          ['@babel/plugin-proposal-decorators', { legacy: true }]
+        ]
+      }
+    })
+  ],
+});
+```
+
+**4. Restart dev server:**
+```bash
+npm run dev
+```
+
+---
+
+### Next.js
+
+**1. Install plugin:**
+```bash
+npm install --save-dev @babel/plugin-proposal-decorators
+```
+
+**2. Enable in `tsconfig.json` or `jsconfig.json`:**
+```json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
+}
+```
+
+**3. Option A - Using Babel (Recommended):**
+
+Create `.babelrc` in project root:
+```json
+{
+  "presets": ["next/babel"],
+  "plugins": [
+    ["@babel/plugin-proposal-decorators", { "legacy": true }]
+  ]
+}
+```
+
+**3. Option B - Using SWC:**
+
+Update `next.config.js`:
+```javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    swcPlugins: [
+      ['@swc/plugin-decorators', { legacy: true }]
+    ]
+  }
+}
+
+module.exports = nextConfig;
+```
+
+**4. Restart Next.js:**
+```bash
+npm run dev
+```
+
+---
+
+### TypeScript (Node.js)
+
+Enable in `tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
+}
+```
+
+---
+
 ## 📖 API Reference
 
 ### HTTP Methods
