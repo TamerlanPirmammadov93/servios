@@ -18,20 +18,28 @@ import {
 
 import type { HttpMethod, RequestConfig, BaseServiceOptions, ServiceOverrides } from './types';
 
-interface CustomAxiosRequestConfig extends AxiosRequestConfig {
-  _retry?: boolean;
-}
+import {
+  buildUrl,
+  isCallingMethodPublic,
+  registerMock,
+  enableMocking,
+  setupInterceptors,
+  type InterceptorState,
+} from './helpers';
 
 export class BaseService {
   protected api: AxiosInstance;
   private mock?: MockAdapter;
+  private interceptorState: InterceptorState;
 
   private options: {
     baseURL: string;
-    version: string;
+    version?: string;
     useMock: boolean;
     mockDelay: number;
-    serviceName: string;
+    isPublic: boolean;
+    serviceName?: string;
+    prefix?: string;
     retryOnStatusCodes: number[];
     logout: () => void;
     removeAccessToken: () => void;
@@ -45,19 +53,16 @@ export class BaseService {
     refreshToken?: () => Promise<{ accessToken: string; refreshToken?: string }>;
   };
 
-  private isRefreshing = false;
-  private failedQueue: Array<{
-    resolve: (value: any) => void;
-    reject: (reason?: any) => void;
-    config: CustomAxiosRequestConfig;
-  }> = [];
-
   constructor(options: BaseServiceOptions) {
+    this.interceptorState = {
+      isRefreshing: false,
+      failedQueue: [],
+    };
+
     this.options = {
-      serviceName: 'api',
-      version: 'v1',
       useMock: false,
       mockDelay: 1000,
+      isPublic: false,
       retryOnStatusCodes: [401],
       transformError: (err) => err.response?.data ?? { message: err.message || 'Network error' },
 
@@ -79,90 +84,24 @@ export class BaseService {
 
     this.api = axios.create({ baseURL: this.options.baseURL });
 
-    if (this.options.useMock) this.enableMocking();
-    this.setupInterceptors();
-  }
+    if (this.options.useMock) {
+      this.mock = enableMocking(this.api, this.options.mockDelay);
+    }
 
-  private enableMocking() {
-    this.mock = new MockAdapter(this.api, {
-      delayResponse: this.options.mockDelay,
-      onNoMatch: 'passthrough',
-    });
-  }
-
-  private setupInterceptors() {
-    this.api.interceptors.request.use((config) => {
-      const token = this.options.getAccessToken!();
-      if (token) config.headers.Authorization = `Bearer ${token}`;
-      return config;
-    });
-
-    this.api.interceptors.response.use(
-      (res) => res,
-      async (error: AxiosError) => {
-        const config = error.config as CustomAxiosRequestConfig;
-        if (!config) return Promise.reject(error);
-
-        const shouldRetry =
-          error.response?.status &&
-          this.options.retryOnStatusCodes!.includes(error.response.status) &&
-          !config._retry;
-
-        if (shouldRetry && this.options.refreshToken) {
-          config._retry = true;
-
-          return new Promise((resolve, reject) => {
-            this.failedQueue.push({ resolve, reject, config });
-
-            if (!this.isRefreshing) {
-              this.isRefreshing = true;
-              this.options.refreshToken!()
-                .then(({ accessToken, refreshToken }) => {
-                  this.options.setAccessToken!(accessToken);
-                  if (refreshToken) {
-                    this.options.setRefreshToken!(refreshToken);
-                  }
-                  this.processQueue(null, accessToken);
-                })
-                .catch((err) => {
-                  this.processQueue(err);
-                  this.options.logout!();
-                })
-                .finally(() => (this.isRefreshing = false));
-            }
-          });
-        }
-        return Promise.reject(error);
-      },
-    );
-  }
-
-  private processQueue(error: any, token?: string) {
-    this.failedQueue.forEach(({ resolve, reject, config }) => {
-      if (error) reject(error);
-      else {
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${token}`;
-        resolve(this.api(config));
-      }
-    });
-    this.failedQueue = [];
-  }
-
-  private buildUrl(endpoint: string, version?: string) {
-    const v = version ?? this.options.version;
-    return `${this.options.serviceName}/${v}/${endpoint.replace(/^\/+/, '')}`;
-  }
-
-  private registerMock<T>(method: HttpMethod, url: string, data: T, status = 200) {
-    if (!this.mock) this.enableMocking();
-    const methodName = `on${method.charAt(0).toUpperCase() + method.slice(1)}` as
-      | 'onGet'
-      | 'onPost'
-      | 'onPut'
-      | 'onPatch'
-      | 'onDelete';
-    (this.mock![methodName] as any)(url).replyOnce(status, data);
+    if (!this.options.isPublic) {
+      setupInterceptors(
+        this.api,
+        {
+          getAccessToken: this.options.getAccessToken!,
+          setAccessToken: this.options.setAccessToken!,
+          setRefreshToken: this.options.setRefreshToken,
+          retryOnStatusCodes: this.options.retryOnStatusCodes!,
+          refreshToken: this.options.refreshToken,
+          logout: this.options.logout!,
+        },
+        this.interceptorState,
+      );
+    }
   }
   
   private logMock(method: string, url: string, data: any) {
@@ -184,20 +123,38 @@ export class BaseService {
       mockData,
       mockStatus = 200,
       includeHeaders = false,
+      isPublic = false,
       config: axiosConfig = {},
     } = config;
 
-    const url = this.buildUrl(endpoint, version);
+    const url = buildUrl(
+      this.options.serviceName,
+      version ?? this.options.version,
+      endpoint,
+      this.options.prefix,
+    );
 
     if ((isMock || this.options.useMock) && mockData !== undefined) {
-      this.registerMock(method, url, mockData, mockStatus);
+      if (!this.mock) {
+        this.mock = enableMocking(this.api, this.options.mockDelay);
+      }
+      registerMock(this.mock, method, url, mockData, mockStatus);
     }
+
+    const isDecoratorPublic = isCallingMethodPublic(this);
+    const finalIsPublic = isPublic || isDecoratorPublic;
+
+    const requestConfig: AxiosRequestConfig & { isPublic?: boolean } = {
+      params,
+      ...axiosConfig,
+      isPublic: finalIsPublic,
+    };
 
     try {
       const response: AxiosResponse<T> =
         method === 'get' || method === 'delete'
-          ? await this.api[method](url, { params, ...axiosConfig })
-          : await this.api[method](url, data ?? {}, { params, ...axiosConfig });
+          ? await this.api[method](url, requestConfig)
+          : await this.api[method](url, data ?? {}, requestConfig);
 
       return includeHeaders
         ? ({ ...response.data, headers: response.headers } as T)
@@ -252,16 +209,6 @@ export const configureBaseService = (
   sharedOptions = options;
 };
 
-export const createService = <T extends BaseService = BaseService>(
-  overrides: Partial<ServiceOverrides> = {},
-  BaseClass: new (opts: BaseServiceOptions) => T = BaseService as any,
-): T => {
-  if (!sharedOptions) {
-    throw new Error('You must call configureBaseService() first');
-  }
-  return new BaseClass({ ...sharedOptions, ...overrides } as BaseServiceOptions);
-};
-
 export class ApiService extends BaseService {
   constructor(overrides: Partial<ServiceOverrides> = {}) {
     if (!sharedOptions)
@@ -269,20 +216,3 @@ export class ApiService extends BaseService {
     super({ ...sharedOptions, ...overrides } as BaseServiceOptions);
   }
 }
-
-export const createServiceWithTokens = (overrides: Partial<ServiceOverrides> = {}) => {
-  if (!sharedOptions) {
-    throw new Error('You must call configureBaseService() first');
-  }
-
-  return new BaseService({
-    ...sharedOptions,
-    ...overrides,
-    getAccessToken: () => getToken(sharedOptions?.tokenConfig),
-    removeAccessToken: () => removeToken(sharedOptions?.tokenConfig),
-    getRefreshToken: () => getRefreshToken(sharedOptions?.tokenConfig),
-    removeRefreshToken: () => removeRefreshToken(sharedOptions?.tokenConfig),
-    setAccessToken: (token: string) => setToken(token, sharedOptions?.tokenConfig),
-    setRefreshToken: (token: string) => setRefreshToken(token, sharedOptions?.tokenConfig),
-  } as BaseServiceOptions);
-};

@@ -1,9 +1,7 @@
 export {
   ApiService,
   BaseService,
-  createService,
   configureBaseService,
-  createServiceWithTokens,
 } from './base-service';
 
 export {
@@ -16,6 +14,8 @@ export {
   removeRefreshToken,
 } from './token';
 
+export { Public, Private } from './decorators';
+
 export type {
   HttpMethod,
   TokenConfig,
@@ -24,7 +24,5 @@ export type {
   BaseServiceOptions,
   RefreshTokenResponse,
 } from './types';
-
-export { ApiService as LegacyApiService } from './api-service';
 
 export { createAxiosInstance } from './axios-instance';

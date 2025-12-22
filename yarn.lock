@@ -1869,10 +1869,10 @@ esutils@^2.0.2:
   resolved "https://registry.npmjs.org/esutils/-/esutils-2.0.3.tgz"
   integrity sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==
 
-everyday-helper@^1.2.3:
-  version "1.2.3"
-  resolved "https://registry.npmjs.org/everyday-helper/-/everyday-helper-1.2.3.tgz"
-  integrity sha512-FocH1M0ZMq48isfacgrZxbnyymJ/JCN8eLu/YY2YGoVMy7K8XuFCER2QQljfOuRpCmSUZomN4FpA+0ChdgFAAw==
+everyday-helper@^1.2.8:
+  version "1.2.8"
+  resolved "https://registry.npmjs.org/everyday-helper/-/everyday-helper-1.2.8.tgz"
+  integrity sha512-c4sA4f4FUuHddgkbnmRT9cMmvrCRN0cNdqCSYswavkXTrealV+E4HpaUKimRf9aqvl8zV2DuQOYNdvi0tEfkEw==
 
 execa@^8.0.0:
   version "8.0.1"

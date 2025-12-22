@@ -32,6 +32,7 @@ export interface RequestConfig<T = any> {
   isMock?: boolean;
   mockStatus?: number;
   includeHeaders?: boolean;
+  isPublic?: boolean;
   config?: AxiosRequestConfig;
   params?: Record<string, any>;
 }
@@ -41,6 +42,9 @@ export interface BaseServiceOptions {
 
   version?: string;
   serviceName?: string;
+  prefix?: string;
+
+  isPublic?: boolean;
 
   removeAccessToken?: () => void;
   removeRefreshToken?: () => void;
@@ -68,7 +72,7 @@ export interface RefreshTokenResponse {
 
 export type ServiceOverrides = Pick<
   BaseServiceOptions,
-  'serviceName' | 'version' | 'useMock' | 'mockDelay' | 'transformError' | 'retryOnStatusCodes'
+  'serviceName' | 'version' | 'prefix' | 'useMock' | 'mockDelay' | 'transformError' | 'retryOnStatusCodes' | 'isPublic'
 >;
 
 export interface ApiServiceConfig {
@@ -79,4 +83,5 @@ export interface ApiServiceConfig {
   refreshTokenEndpoint?: string;
   onRefreshTokenFail?: () => void;
   headers?: Record<string, string>;
+  refreshTokenWithCredentials?: boolean;
 }

@@ -1,11 +1,9 @@
 import axios, { AxiosHeaders } from 'axios';
-import type {
-  AxiosError,
-  AxiosInstance,
-  AxiosResponse,
-  InternalAxiosRequestConfig,
-} from 'axios';
+
+import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+
 import { getToken, setToken } from './token';
+
 import type { ApiServiceConfig, RefreshTokenResponse } from './types';
 
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
@@ -15,13 +13,14 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 const refreshToken = async (
   baseUrl: string,
   refreshEndpoint: string,
+  withCredentials: boolean = true,
   onRefreshTokenFail?: () => void,
 ): Promise<string | null> => {
   try {
     const response = await axios.post<RefreshTokenResponse>(
       `${baseUrl}${refreshEndpoint}`,
       {},
-      { withCredentials: true },
+      { withCredentials },
     );
     setToken(response.data.accessToken);
     return response.data.accessToken;
@@ -40,6 +39,7 @@ export const createAxiosInstance = (config: ApiServiceConfig): AxiosInstance => 
     baseUrl,
     headers = {},
     withCredentials = true,
+    refreshTokenWithCredentials = true,
     timeout = 30000,
     refreshTokenEndpoint = '/refresh',
     onRefreshTokenFail,
@@ -82,6 +82,7 @@ export const createAxiosInstance = (config: ApiServiceConfig): AxiosInstance => 
         const newToken = await refreshToken(
           baseUrl,
           refreshTokenEndpoint,
+          refreshTokenWithCredentials,
           onRefreshTokenFail,
         );
 
